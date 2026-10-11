@@ -22,7 +22,7 @@ This is where thread safety comes into play. By ensuring that the counter is upd
 
 **Fix it via:**
 
-1. **Method Level Synchronization:* Simpler but blocks the whole method into a single thread and others has to wait for the lock to be released.
+1. **Method Level Synchronization:** Simpler but blocks the whole method into a single thread and others has to wait for the lock to be released.
 
 2. **Block Level Synchronization:** More fine-grained control, blocks only the critical section of code, allowing other threads to execute non-critical sections concurrently.
 
