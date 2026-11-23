@@ -124,7 +124,8 @@ public String getETAWithBackoff() throws InterruptedException {
             log.warn("Failed to fetch ETA. Retries left: " + retries);
             if(retries > 0){
                 try {
-                    Thread.sleep(backoffTime); // Wait before retrying
+                    int jitter = new Random().nextInt(500); // Add some jitter to avoid thundering herd problem
+                    Thread.sleep(backoffTime + jitter); // Wait before retrying
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt(); // Restore interrupted status
                 }
@@ -165,7 +166,23 @@ class PaymentService {
     }
 }
 ```
-**JAVA CONFIG CUSTOMIZATION:**
+
+### **JAVA CONFIG CUSTOMIZATION:**
+
+1. **application.properties**: You can configure the circuit breaker properties using `resilience4j` library in the `application.properties` file.
+```application.properties
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+```
+2. **Java Configuration**: You can also customize the circuit breaker configuration programmatically using a `Customizer` bean.
 ```java
 @Bean
 public Customizer<CircuitBreakerConfigCustomizer> paymentCircuitBreakerConfig() {
@@ -192,3 +209,40 @@ Example : Switching to Stripe Payment Gateway when PayPal is down.
 A timeout is a mechanism used to prevent long waits or hangs when a service becomes unresponsive. Instead of waiting indefinitely for a response, a timeout defines a maximum amount of time to wait before the request is aborted.
 
 Example: If a payment service does not respond within 5 seconds, the system should abort the request and return an error message to the user, allowing them to retry or choose an alternative payment method.
+
+
+
+```java
+
+// Timeout Strategy Example
+HttpClient client = HttpClient.newBuilder()
+    .connectTimeout(Duration.ofSeconds(5)) // Set connection timeout
+    .build();
+
+
+// Failover Strategy Example
+
+public String getData(){
+    try{
+        return primaryService.fetchData();
+    }
+    catch(Exception e){
+        return failoverService.fetchData(); // Switch to standby service
+    }
+}
+```
+
+## Engineering Checklist for Resilient Systems
+
+1. **Temporary Spike** : Use Retry with backoff strategy to handle temporary spikes in traffic or service unavailability.
+
+2. **Persistent Failure**: Implement Circuit Breaker pattern to prevent cascading failures and allow the system to recover.
+
+3. **Third-party Delay**:: Use Timeout strategy to avoid long waits and ensure responsiveness.
+
+4. **Degraded Experience**: Use fallback UI or cached data to maintain functionality and minimize disruption to the user experience.
+
+5. **Avoid flooding the system**: Implement queueing, rate limiting and throttling to prevent overwhelming the system with requests during failures.
+
+6. **Highly critical services**: Use failover strategies to switch to standby services when primary services are down, ensuring high availability.
+
